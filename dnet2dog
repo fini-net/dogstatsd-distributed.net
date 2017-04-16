@@ -1,0 +1,8 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use DataDog::DogStatsd;
+
+my $statsd = DataDog::DogStatsd->new;
+$statsd->increment( 'test.runs');

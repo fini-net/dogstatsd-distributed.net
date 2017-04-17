@@ -27,7 +27,7 @@ sub follow_file {
 	}
 	
 	my $start_lines = 0;
-	$start_lines = 200 if $debug;
+	$start_lines = 20 if $debug;
 	my $tail = File::Tail->new(name=>$filename, tail=>$start_lines);
 
 	my ($freshline,$bufferline);
@@ -109,7 +109,7 @@ sub agent_line {
 			if ($line =~ /to server\./) {
 				$dogstatsd->gauge( "dnet.rc5-72.buffer.buff_out_r72}",0) unless $debug;
 				print "count=0 for dnet.rc5-72.buffer.buff_out_r72\n";
-			} elsif ($line =~ /(\d+)packets .*from server\./) {
+			} elsif ($line =~ /(\d+) packets .*from server\./) {
 				$packet_count = $1;
 				$dogstatsd->gauge( "dnet.rc5-72.buffer.buff_in_r72",$packet_count) unless $debug;
 				print "count=$packet_count for dnet.rc5-72.buffer.buff_in_r72\n";

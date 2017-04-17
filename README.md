@@ -8,6 +8,7 @@ agents and proxies into [datadog](https://www.datadoghq.com/) via
 
 * Perl
 * Perl module [DataDog::DogStatsd](https://github.com/binary-com/dogstatsd-perl) 
+* Perl module [File::Tail](https://metacpan.org/pod/File::Tail) (Debian package `libfile-tail-perl`)
 
 ## Support
 

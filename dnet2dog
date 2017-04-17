@@ -3,6 +3,111 @@
 use strict;
 use warnings;
 use DataDog::DogStatsd;
+use File::Tail;
 
-my $statsd = DataDog::DogStatsd->new;
-$statsd->increment( 'test.runs');
+#TODO: handle options
+my $opt_proxy = 0;
+my $debug = 0;
+
+my $dogstatsd = DataDog::DogStatsd->new;
+$dogstatsd->increment( 'dnet.script_runs') unless $debug;
+
+my ($logfile) = @ARGV;
+follow_file($logfile,$opt_proxy);
+
+sub follow_file {
+	my($filename,$proxy) = @_;
+
+	if ($proxy) {
+		die "unimplemented: following proxy logs";
+	}
+
+	unless (-f $filename) {
+		die "no such file: $filename";
+	}
+	
+	my $start_lines = 0;
+	$start_lines = 200 if $debug;
+	my $tail = File::Tail->new(name=>$filename, tail=>$start_lines);
+
+	my ($freshline,$bufferline);
+	while (defined( $freshline = $tail->read )) {
+		chomp($freshline);
+		#print "TOP $freshline\n";
+
+		if ($freshline =~ /^\[/) {
+			# new
+			if ($proxy) {
+				# ??
+			} else {
+				agent_line($bufferline) if defined $bufferline;
+			}
+
+			$bufferline = undef;
+		}
+
+		# add fresh to buffer after cleanups
+		$freshline =~ s/^\[.*UTC] //; # strip timestamps
+		$freshline =~ s/^ +/ /; # shrink whitespace
+		$bufferline .= $freshline;
+	}
+}
+
+sub agent_line {
+	my ($line) = @_;
+
+	if ($line =~ /^RC5-72: /) {
+		$line =~ s/^RC5-72: //;
+		#print "RC5 $line\n";
+
+		if ($line =~ /in buff/) {
+			my $packet_count;
+			if ($line =~ /(\d+) packets/) {
+				$packet_count = $1;
+			} else {
+				warn "no packet count in $line";
+				return;
+			}
+
+			my $buff_name;
+			if ($line =~ /in (buff[^ ]*)/) {
+				$buff_name = $1;
+			} else {
+				warn "no file name in $line";
+				return;
+			}
+
+			my $buff_name_encoded = $buff_name;
+			$buff_name_encoded =~ s/[.]/_/g;
+
+			$dogstatsd->gauge( "dnet.rc5-72.buffer.${buff_name_encoded}",$packet_count) unless $debug;
+			print "count=$packet_count name=$buff_name\n";
+		} elsif ($line =~ /^Summary/) {
+			my $packet_count;
+			if ($line =~ /(\d+) packets/) {
+				$packet_count = $1;
+			} else {
+				warn "no packet count in $line";
+				return;
+			}
+
+			my $keyrate;
+			if ($line =~ /\[(.*)keys\/s]/) {
+				$keyrate = $1;
+			} else {
+				warn "no keyrate in $line";
+				return;
+			}
+			$keyrate =~ s/,//g; # strip commas
+			#TODO: translate keyrate
+
+			$dogstatsd->gauge( "dnet.rc5-72.packets_processed",$packet_count) unless $debug;
+			print "count=$packet_count rate=$keyrate\n";
+
+		} elsif ($line =~ /(from|to) server\./) {
+			# not graphing yet
+		} else {
+			warn "UNHANDLED $line\n";
+		}
+	}
+}

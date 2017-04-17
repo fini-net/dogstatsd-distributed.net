@@ -12,7 +12,11 @@ agents and proxies into [datadog](https://www.datadoghq.com/) via
 
 ## Metrics generated
 
-TODO: fill
+| metric				| description 						|
+| ----					| ----							|
+| `dnet.rc5-72.packets_processed`	| number of packets completed since `dnetc` started (RC5-72) |
+| `dnet.rc5-72.buffer.buff_out_r72`	| number of packets in completed ("out") buffer (RC5-72) |
+| `dnet.rc5-72.buffer.buff_in_r72`	| number of packets in todo ("in") buffer (RC5-72)	|
 
 ## Support
 

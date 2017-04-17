@@ -107,7 +107,7 @@ sub agent_line {
 		} elsif ($line =~ /(from|to) server\./) {
 			my $packet_count;
 			if ($line =~ /to server\./) {
-				$dogstatsd->gauge( "dnet.rc5-72.buffer.buff_out_r72}",0) unless $debug;
+				$dogstatsd->gauge( "dnet.rc5-72.buffer.buff_out_r72",0) unless $debug;
 				print "count=0 for dnet.rc5-72.buffer.buff_out_r72\n";
 			} elsif ($line =~ /(\d+) packets .*from server\./) {
 				$packet_count = $1;

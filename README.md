@@ -18,6 +18,8 @@ agents and proxies into [datadog](https://www.datadoghq.com/) via
 | `dnet.rc5-72.buffer.buff_out_r72`	| number of packets in completed ("out") buffer (RC5-72) |
 | `dnet.rc5-72.buffer.buff_in_r72`	| number of packets in todo ("in") buffer (RC5-72)	|
 
+![example](img/datadog_rc5-72_buffers.png)
+
 ## Support
 
 Please file tickets via [github](https://github.com/fini-net/dogstatsd-distributed.net/issues).

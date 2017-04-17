@@ -10,6 +10,11 @@ agents and proxies into [datadog](https://www.datadoghq.com/) via
 * Perl module [DataDog::DogStatsd](https://github.com/binary-com/dogstatsd-perl) 
 * Perl module [File::Tail](https://metacpan.org/pod/File::Tail) (Debian package `libfile-tail-perl`)
 
+## Metrics generated
+
+TODO: fill
+
 ## Support
 
 Please file tickets via [github](https://github.com/fini-net/dogstatsd-distributed.net/issues).
+MR's welcomed whether I [plan to do it](TODO.md) or not.

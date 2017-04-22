@@ -84,7 +84,7 @@ sub agent_line {
 			print "count=$packet_count name=$buff_name\n";
 		} elsif ($line =~ /^Summary/) {
 			my $packet_count;
-			if ($line =~ /(\d+) packets/) {
+			if ($line =~ /(\d+) packet[s]? /) {
 				$packet_count = $1;
 			} else {
 				warn "no packet count in $line";

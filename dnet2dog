@@ -1,0 +1,216 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use Data::Dumper;
+use File::Slurp;
+use Date::Parse;
+
+#TODO: handle options
+my $opt_proxy = 0;
+my $debug = 0;
+
+our %months = (
+	'jan' => 1,
+	'feb' => 2,
+	'mar' => 3,
+	'apr' => 4,
+	'may' => 5,
+	'jun' => 6,
+	'jul' => 7,
+	'aug' => 8,
+	'sep' => 9,
+	'oct' => 10,
+	'nov' => 11,
+	'dec' => 12,
+);
+
+my ($src_dir,$dest_dir) = @ARGV;
+dnet_log_sync($src_dir,$dest_dir);
+
+sub dnet_log_sync {
+	my($src_dir,$dest_dir) = @_;
+
+	die "'$src_dir' is not a directory" unless -d $src_dir;
+	die "'$dest_dir' is not a directory" unless -d $dest_dir;
+	$src_dir =~ s{[/]$}{}; # rm superfulous trailing slash
+	$dest_dir =~ s{[/]$}{}; # rm superfulous trailing slash
+
+	print "from $src_dir to $dest_dir\n";
+
+	opendir(SRCDIR,$src_dir) or die "couldn't opendir($src_dir): $!";
+	my @src_files = readdir(SRCDIR);
+	closedir(SRCDIR) or die "couldn't closedir($src_dir): $!";
+
+#	opendir(DESTDIR,$dest_dir) or die "couldn't opendir($dest_dir): $!";
+#	my @dest_files = readdir(DESTDIR);
+#	closedir(DESTDIR) or die "couldn't closedir($dest_dir): $!";
+
+	foreach my $file (@src_files) {
+		next if $file =~ /^[.]/;
+		next unless $file =~ /_\d\d.*[.]log$/;
+		$file =~ /(\w+)_(\d\d)(\w+)[.]log/;
+		my $hostname = $1;
+		my $year = $2 + 2000;
+		my $month_word = $3;
+		my $month = sprintf( "%02i", $months{$month_word} );
+		print "$file // $hostname // $year $month_word $month\n";
+
+		my $dest_host_dir = "$dest_dir/$hostname";
+		unless (-d $dest_host_dir) {
+			if (-e $dest_host_dir) {
+				die "expected dir $dest_host_dir already exists, but not a dir";
+			}
+			mkdir($dest_host_dir) or die "couldn't mkdir($dest_host_dir): $!";
+		}
+
+		my $dest_file = "$dest_host_dir/dnetc_${year}${month}_${hostname}.log";
+		if (-e $dest_file) {
+			die "unimplemented";
+		} else {
+			print "start over with $dest_file\n";
+			process_file("$src_dir/$file",$dest_file,$year,$hostname);
+		}
+	}
+}
+
+sub process_file {
+	my($src_file,$dest_file,$year,$hostname) = @_;
+	my @lines = read_file($src_file);
+	my $line_count = scalar(@lines);
+	print "processing $line_count lines from $src_file into $dest_file\n";
+
+	my @unwrapped_lines;
+	for( my $c = 0; $c < $line_count; $c++) {
+		my $line = $lines[$c];
+		chomp($line); # remove newline
+		next unless length($line); # skip blank
+
+		if ($line =~ /^\s/) {
+			$line =~ s/^\s+/ /;
+			$unwrapped_lines[scalar(@unwrapped_lines) - 1] .= $line;
+		} else {
+			push(@unwrapped_lines,$line);
+		}
+	}
+
+	my @logs;
+	foreach my $line (@unwrapped_lines) {
+		if ($opt_proxy) {
+			die "unimplemented support for proxy logs";
+			# may need refactor if log & time formats are similar enough
+		} else {
+			unless ($line =~ /^[[]/) {
+				next if $line =~ /^dnetc v/;
+				next if $line =~ /^Using email/;
+				warn "SKIPping $line";
+				next;
+			}
+			$line =~ /\[(.*)\] (.*)/;
+			my $timetext = $1;
+			my $content = $2;
+
+			$timetext =~ /(\w+) (\d+) ([0-9:]+) (\w+)/;
+			die "weird $timetext" unless defined $4;
+			my $month = $1;
+			my $day = $2;
+			my $hms = $3;
+			my $tz = $4;
+
+			my $parsable_time = "$day $month $year $hms $tz";
+			my $time = str2time($parsable_time);
+
+			push(@logs, agent_line($time,$content));
+		}
+	}
+	#print Dumper(\@logs);
+
+	my @out_lines = map { $_ . "\n" } @logs;
+	open(my $dest_fh,'>',$dest_file) or die "couldn't open(>$dest_file): $!";
+	print $dest_fh @out_lines;
+	close($dest_fh) or die "bad close: $!";
+}
+
+sub agent_line {
+	my ($time,$line) = @_;
+
+	my @logs;
+	if ($line =~ /^RC5-72: /) {
+		$line =~ s/^RC5-72: //;
+		#print "RC5 $line\n";
+
+		if ($line =~ /in buff/) {
+			my $packet_count;
+			if ($line =~ /(\d+) packet[s ]/) {
+				$packet_count = $1;
+			} else {
+				warn "no packet count in $line";
+				return;
+			}
+
+			my $buff_name;
+			if ($line =~ /in (buff[^ ]*)/) {
+				$buff_name = $1;
+			} else {
+				warn "no file name in $line";
+				return;
+			}
+
+			my $buff_name_encoded = $buff_name;
+			$buff_name_encoded =~ s/[.-]/_/g;
+
+			push(@logs, "dnet.rc5_72.buffer.${buff_name_encoded}"
+				. " $time $packet_count"
+				. " metric_type=gauge unit=packet"
+			);
+			#print "count=$packet_count name=$buff_name\n";
+		} elsif ($line =~ /^Summary/) {
+			my $packet_count;
+			if ($line =~ /(\d+) packet[s]? /) {
+				$packet_count = $1;
+			} else {
+				warn "no packet count in $line";
+				return;
+			}
+
+			my $keyrate;
+			if ($line =~ /\[(.*)keys\/s]/) {
+				$keyrate = $1;
+			} else {
+				warn "no keyrate in $line";
+				return;
+			}
+			$keyrate =~ s/,//g; # strip commas
+			#TODO: translate keyrate
+
+			push(@logs, "dnet.rc5_72.buffer.packets_processed"
+				. " $time $packet_count"
+				. " metric_type=gauge unit=packet"
+			);
+			#print "count=$packet_count rate=$keyrate\n";
+
+		} elsif ($line =~ /(from|to) server\./) {
+			my $packet_count;
+			if ($line =~ /to server\./) {
+				push(@logs, "dnet.rc5_72.buffer.buff_out_r72"
+					. " $time 0"
+					. " metric_type=gauge unit=packet"
+				);
+				#print "count=0 for dnet.rc5-72.buffer.buff_out_r72\n";
+			} elsif ($line =~ /(\d+) packets .*from server\./) {
+				$packet_count = $1;
+				push(@logs, "dnet.rc5_72.buffer.buff_in_r72"
+					. " $time $packet_count"
+					. " metric_type=gauge unit=packet"
+				);
+				#print "count=$packet_count for dnet.rc5-72.buffer.buff_in_r72\n";
+			}
+		} elsif ($line =~ /^using core/) {
+			# not that interesting
+		} else {
+			warn "UNHANDLED $line\n";
+		}
+	}
+
+	return @logs;
+}

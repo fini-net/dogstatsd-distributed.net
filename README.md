@@ -7,8 +7,10 @@ agents and proxies into [datadog](https://www.datadoghq.com/) via
 ## Requirements
 
 * Perl
-* Perl module [DataDog::DogStatsd](https://github.com/binary-com/dogstatsd-perl) 
-* Perl module [File::Tail](https://metacpan.org/pod/File::Tail) (Debian package `libfile-tail-perl`)
+* Perl module [File::Slurp](https://metacpan.org/pod/File::Slurp) (Debian package `libfile-slurp-perl`)
+* Perl module [Date::Parse](https://metacpan.org/pod/Date::Parse) (Debian package `libtimedate-perl`)
+* add files to `/etc/dd-agent/dogstatsd.conf` under `dogstreams:`
+* add this script to `cron` (work-in-progress)
 
 ## Metrics generated
 
